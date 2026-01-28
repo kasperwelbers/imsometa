@@ -1,0 +1,26 @@
+services:
+  scraper-api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    # IPC Host is crucial for Playwright to avoid crashes
+    ipc: host
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    # Custom command to enable persistence and memory limits
+    # --maxmemory 2gb: Evicts keys when RAM hits 2GB
+    # --maxmemory-policy allkeys-lru: Deletes least recently used keys when full
+    # --appendonly yes: Enables AOF persistence (saves to disk)
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+
+volumes:
+  redis_data:
