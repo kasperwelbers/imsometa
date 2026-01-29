@@ -1,22 +1,23 @@
-# Use the official Playwright image (Focal is Ubuntu 20.04)
-FROM mcr.microsoft.com/playwright:v1.41.0-focal
+# official Playwright image with Ubuntu 22.04
+FROM mcr.microsoft.com/playwright:v1.41.0-jammy
 
-# Install Bun
-RUN curl -fsSL https://bun.sh/install | bash
+RUN apt-get update && apt-get install -y \
+    unzip \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV BUN_INSTALL="/root/.bun"
 ENV PATH="$BUN_INSTALL/bin:$PATH"
+RUN curl -fsSL https://bun.sh/install | bash
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json bun.lockb ./
-RUN bun install
+COPY package.json bun.lock ./
 
-# Copy source
+RUN bun install --frozen-lockfile
+
 COPY . .
 
-# Expose port
 EXPOSE 3000
 
-# Run the app
 CMD ["bun", "run", "src/index.ts"]

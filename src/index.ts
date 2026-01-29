@@ -4,8 +4,8 @@ import index from "./index.html";
 
 const server = serve({
   routes: {
-    "/api/*": api.fetch,
-    "/*": index,
+    "/meta": api.fetch,
+    "/": index,
   },
   development: process.env.NODE_ENV !== "production" && {
     hmr: true,
