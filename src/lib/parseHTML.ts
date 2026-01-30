@@ -27,6 +27,9 @@ import publisher from "metascraper-publisher";
 import title from "metascraper-title";
 import urlRule from "metascraper-url";
 import video from "metascraper-video";
+import type { Data } from "./types";
+import { ca } from "zod/v4/locales";
+import { normUrl } from "./cache";
 
 // Initialize the scraper with all rules
 const scraper = metascraper([
@@ -59,7 +62,54 @@ const scraper = metascraper([
   video(),
 ]);
 
-export async function getMetadata(url: string, html: string) {
+export function getCanonicalFromHTML(html: string): string | null {
+  let canonical: string | null = null;
+
+  new HTMLRewriter()
+    .on('link[rel="canonical"]', {
+      element(el) {
+        canonical = el.getAttribute("href");
+      },
+    })
+    .transform(new Response(html));
+
+  return canonical;
+}
+
+export async function parseHTML(url: string, html: string): Promise<Data> {
   const metadata = await scraper({ html, url });
-  return metadata;
+  const data: Data = metadata;
+
+  const { canonical_url, oembed_url } = extractDiscoveryLinks(html);
+  if (canonical_url) data.canonical_url = canonical_url;
+  if (oembed_url) data.oembed_url = oembed_url;
+
+  if (oembed_url) {
+    try {
+      const oRes = await fetch(oembed_url);
+      data.oembed = await oRes.json();
+    } catch (e) {}
+  }
+
+  return data;
+}
+
+function extractDiscoveryLinks(html: string) {
+  let canonical_url: string | undefined;
+  let oembed_url: string | undefined;
+
+  new HTMLRewriter()
+    .on('link[rel="canonical"]', {
+      element(el) {
+        canonical_url = el.getAttribute("href") ?? undefined;
+      },
+    })
+    .on('link[type="application/json+oembed"]', {
+      element(el) {
+        oembed_url = el.getAttribute("href") ?? undefined;
+      },
+    })
+    .transform(new Response(html));
+
+  return { canonical_url, oembed_url };
 }

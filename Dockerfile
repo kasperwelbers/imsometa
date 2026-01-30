@@ -1,5 +1,5 @@
 # official Playwright image with Ubuntu 22.04
-FROM mcr.microsoft.com/playwright:v1.41.0-jammy
+FROM mcr.microsoft.com/playwright:v1.58.0-jammy
 
 RUN apt-get update && apt-get install -y \
     unzip \

@@ -17,7 +17,10 @@ export async function fetchMethod(url: string): Promise<string> {
 
       try {
         const response = await fetch(url, {
-          headers: { "User-Agent": "Twitterbot" },
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (compatible; AcademicMetaBot/1.0; Twitterbot",
+          },
           signal: controller.signal,
         });
 
