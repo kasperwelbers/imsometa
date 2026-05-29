@@ -1,66 +1,58 @@
-import { Database } from "bun:sqlite";
-import type { Method } from "./types";
+import { and, eq } from "drizzle-orm";
 import type { Metadata } from "metascraper";
 import normalizeUrl from "normalize-url";
-
-const db = new Database("imsometa_db.sqlite", { create: true });
-
-interface Row {
-  url: string;
-  method: Method;
-  meta_json: string;
-}
-
-const createTable = db.query(`
-    CREATE TABLE IF NOT EXISTS url_metadata(
-        norm_url TEXT NOT NULL,
-        method TEXT NOT NULL,
-        meta_json TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        PRIMARY KEY (norm_url, method)
-    )
-`);
-createTable.run();
-
-const upsertQuery = db.query(`
-    INSERT INTO url_metadata (norm_url, method, meta_json, created_at)
-    VALUES ($norm_url, $method, $json, $now)
-    ON CONFLICT(norm_url, method) DO UPDATE SET
-        meta_json = excluded.meta_json,
-        created_at = excluded.created_at
-`);
-const selectQuery = db.query<Row, any>(
-  "SELECT meta_json FROM url_metadata WHERE norm_url = $norm_url AND method = $method",
-);
+import { db } from "./db.ts";
+import { urlMetadata } from "./schema.ts";
+import type { Method } from "./types";
 
 export async function setCachedMeta(
   url: string,
   method: Method,
   metadata: Metadata,
-) {
-  const now = Date.now();
+): Promise<void> {
+  if (method === "both") return; // "both" is a routing hint, never a cache key
 
-  upsertQuery.run({
-    $norm_url: normUrl(url),
-    $method: method,
-    $json: JSON.stringify(metadata),
-    $now: now,
-  });
+  await db
+    .insert(urlMetadata)
+    .values({
+      normUrl: normUrl(url),
+      method,
+      metaJson: metadata as Record<string, unknown>,
+      createdAt: Date.now(),
+    })
+    .onConflictDoUpdate({
+      target: [urlMetadata.normUrl, urlMetadata.method],
+      set: {
+        metaJson: metadata as Record<string, unknown>,
+        createdAt: Date.now(),
+      },
+    });
 }
 
 export async function getCachedMeta(
   url: string,
   method: Method,
 ): Promise<Metadata | null> {
-  const row = selectQuery.get({ $normUrl: normUrl(url), $method: method });
-  if (!row?.meta_json) return null;
-  return JSON.parse(row.meta_json);
+  if (method === "both") return null; // not a real cache key
+
+  const rows = await db
+    .select()
+    .from(urlMetadata)
+    .where(
+      and(
+        eq(urlMetadata.normUrl, normUrl(url)),
+        eq(urlMetadata.method, method),
+      ),
+    )
+    .limit(1);
+
+  return (rows[0]?.metaJson as Metadata) ?? null;
 }
 
 export function normUrl(rawUrl: string): string {
-  // We heavily normalize URLs for caching to avoid duplicates.
-  // Note that for the lookup we use the original url, so it's ok to strip protocol here and such.
-
+  // Heavily normalise URLs for cache deduplication.
+  // The original URL is still used for the actual request, so stripping
+  // tracking params / protocol here is safe.
   return normalizeUrl(rawUrl, {
     removeQueryParameters: [
       /^utm_/, // Google Analytics

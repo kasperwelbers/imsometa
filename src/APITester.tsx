@@ -64,7 +64,9 @@ export function APITester() {
         <div className="flex items-center gap-3 justify-start">
           <Select
             value={payload.method}
-            onValueChange={(value) => setPayload({ ...payload, method: value })}
+            onValueChange={(value) =>
+              setPayload({ ...payload, method: value as Method })
+            }
           >
             <SelectTrigger className="bg-primary/20 border-none">
               method = {payload.method}
@@ -77,7 +79,9 @@ export function APITester() {
           </Select>
           <Select
             value={payload.cache}
-            onValueChange={(value) => setPayload({ ...payload, cache: value })}
+            onValueChange={(value) =>
+              setPayload({ ...payload, cache: value as Cache })
+            }
           >
             <SelectTrigger className="bg-primary/20 border-none w-40">
               cache = {payload.cache}

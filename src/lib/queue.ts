@@ -63,7 +63,7 @@ async function getData(
     });
 
   if (cache === "true" || cache === "refresh") {
-    setCachedMeta(url, "fetch", data);
+    await setCachedMeta(url, method, data);
   }
 
   return { data, method, cache: false };

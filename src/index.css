@@ -6,7 +6,7 @@
     }
 
     body {
-        @apply grid place-items-center min-w-[320px] min-h-screen relative m-0 bg-linear-60 from-secondary  to-primary text-foreground;
+        @apply flex flex-col min-w-[320px] min-h-screen relative m-0 bg-linear-60 from-secondary to-primary text-foreground;
     }
 }
 
