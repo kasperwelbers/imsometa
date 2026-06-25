@@ -1,6 +1,10 @@
 import { Semaphore, withTimeout, E_TIMEOUT } from "async-mutex";
 
-const MAX_CONCURRENT_FETCH = 50;
+// Optional datacenter proxy for outbound fetch requests (e.g. Webshare rotating endpoint).
+// Format: http://user:pass@p.webshare.io:80
+const PROXY_DATACENTER = process.env.PROXY_DATACENTER ?? null;
+
+const MAX_CONCURRENT_FETCH = Number(process.env.FETCH_CONCURRENCY ?? 50);
 const FETCH_QUEUE_TIMEOUT = 10_000; // 10s wait in queue
 const NETWORK_TIMEOUT = 10_000; // 10s wait for the actual download
 
@@ -16,13 +20,15 @@ export async function fetchMethod(url: string): Promise<string> {
       const timeoutId = setTimeout(() => controller.abort(), NETWORK_TIMEOUT);
 
       try {
-        const response = await fetch(url, {
+        const fetchInit: RequestInit & { proxy?: string } = {
           headers: {
             "User-Agent":
               "Mozilla/5.0 (compatible; AcademicMetaBot/1.0; Twitterbot",
           },
           signal: controller.signal,
-        });
+          ...(PROXY_DATACENTER && { proxy: PROXY_DATACENTER }),
+        };
+        const response = await fetch(url, fetchInit);
 
         if (!response.ok) {
           console.warn(`Fetch failed for ${url}: ${response.status}`);

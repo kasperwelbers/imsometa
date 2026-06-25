@@ -4,7 +4,7 @@ A metadata scraping service built with Bun, Hono, React, Drizzle ORM, and Playwr
 
 ## Development
 
-This project relies on [Playwright](https://playwright.dev/) for browser-based scraping, and [PostgreSQL](https://www.postgresql.org/) for persistence. The recommended way to run the app locally is via **Docker Compose**, which handles all of that automatically.
+This project relies on [Playwright](https://playwright.dev/) for browser-based scraping and uses **SQLite** (via Bun's built-in driver) for persistence. The recommended way to run the app locally is via **Docker Compose**, which handles all of that automatically.
 
 ### Prerequisites
 
@@ -16,7 +16,7 @@ This project relies on [Playwright](https://playwright.dev/) for browser-based s
 docker compose up
 ```
 
-This builds the image (based on the official Playwright Docker image), starts a PostgreSQL container, runs any pending database migrations, and starts the app at [http://localhost:3000](http://localhost:3000) with **hot reloading** enabled — changes to source files are picked up automatically.
+This builds the image (based on the official Playwright Docker image), runs any pending database migrations, and starts the app at [http://localhost:3000](http://localhost:3000) with **hot reloading** enabled — changes to source files are picked up automatically. The SQLite database is stored in a named Docker volume (`app_data`).
 
 To rebuild the image after changing dependencies (e.g. `package.json`):
 
@@ -26,7 +26,7 @@ docker compose up --build
 
 ## Database & migrations
 
-The database schema lives in [`src/lib/schema.ts`](src/lib/schema.ts). Migrations are managed with [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) and live in the `drizzle/` directory.
+The database schema lives in [`src/lib/schema.ts`](src/lib/schema.ts). Migrations are managed with [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) and live in the `drizzle/` directory. The SQLite file is stored at `./data/imsometa.db` (inside the container, mounted as a named volume in Docker).
 
 ### Workflow for schema changes
 
@@ -83,21 +83,86 @@ GET /results/export?tag=<tag>&batchId=<id>   — download as JSON
 
 ## Running without Docker
 
-If you have Playwright's browser dependencies and a local PostgreSQL instance:
+If you have Playwright's browser dependencies installed:
 
 ```bash
 bun install
-export DATABASE_URL=postgres://user:pass@localhost:5432/imsometa
 bun run db:migrate
 bun dev        # development with hot reloading
 bun start      # production mode
 ```
 
+The database file will be created at `./data/imsometa.db` automatically. Set `DATABASE_PATH` to override the location.
+
 > **Note:** This is not recommended for most developers. The Docker Compose setup is the reliable path.
 
-## Production
+## Proxies
+
+Both scraping methods support optional proxy configuration via environment variables. If an env var is unset the method connects directly.
+
+| Variable | Used by | Recommended type |
+|---|---|---|
+| `PROXY_DATACENTER` | `fetch` method | Webshare rotating datacenter |
+| `PROXY_RESIDENTIAL` | Playwright method | Webshare rotating residential |
+
+Webshare exposes a **single rotating endpoint** for each proxy type — it cycles through your pool automatically, so you only need one URL per variable.
+
+Create or update your `.env` file (never commit this):
+
+```env
+# .env
+PROXY_DATACENTER=http://username:password@p.webshare.io:80
+PROXY_RESIDENTIAL=http://username:password@p.webshare.io:8080
+```
+
+The exact hostnames and ports are shown in your Webshare dashboard under **Proxy → Access credentials**. Both variables are completely optional — omit either to connect without a proxy for that method.
+
+## Deploying to a NAS (or any Docker host)
+
+The recommended production path is to publish the image to Docker Hub via CI and pull it on your NAS using the provided [`docker-compose.prod.yml`](docker-compose.prod.yml).
+
+### 1. Publish the image to Docker Hub
+
+The GitHub Actions workflow in [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) builds a **multi-platform image** (`linux/amd64` + `linux/arm64`) and pushes it to Docker Hub automatically on every push to `main`.
+
+**One-time setup:**
+
+1. Create a [Docker Hub](https://hub.docker.com/) account and a repository named `imsometa`.
+2. Generate a Docker Hub **Access Token** (Account Settings → Security → New Access Token).
+3. In your GitHub repository go to **Settings → Secrets and variables → Actions** and add:
+   - `DOCKERHUB_USERNAME` — your Docker Hub username
+   - `DOCKERHUB_TOKEN` — the access token you just created
+
+From then on, pushing to `main` (or pushing a `v*` tag) triggers the workflow and your image lands at `your-username/imsometa:latest`.
+
+> **Note:** The first build takes a while because it cross-compiles the ARM image under QEMU emulation. Subsequent builds are fast thanks to GitHub Actions layer caching.
+
+### 2. Deploy on your NAS
+
+Copy [`docker-compose.prod.yml`](docker-compose.prod.yml) to your NAS (no other files needed) and start the stack:
 
 ```bash
-docker build -t imsometa .
-docker run -p 3000:3000 -e DATABASE_URL=postgres://... imsometa
+IMAGE=your-dockerhub-username/imsometa:latest docker compose -f docker-compose.prod.yml up -d
+```
+
+The app will be available on port **3000**. The SQLite database is stored in a named Docker volume (`app_data`) so it persists across container restarts and updates. Migrations run automatically on startup.
+
+To pull and restart with the latest image:
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Manual one-off build & push
+
+If you want to push manually without GitHub Actions:
+
+```bash
+docker buildx create --use
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t your-dockerhub-username/imsometa:latest \
+  --push \
+  .
 ```

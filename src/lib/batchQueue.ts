@@ -4,7 +4,7 @@ import { batchItems, batches } from "./schema.ts";
 import { processUrl } from "./queue.ts";
 import type { BatchItem } from "./schema.ts";
 
-const BATCH_CONCURRENCY = 3;
+const BATCH_CONCURRENCY = Number(process.env.BATCH_CONCURRENCY ?? 5);
 // How many pending items to inspect when choosing the next one to process.
 // A wider window gives better domain interleaving at the cost of a slightly
 // heavier DB read.

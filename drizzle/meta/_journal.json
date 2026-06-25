@@ -1,12 +1,12 @@
 {
   "version": "7",
-  "dialect": "postgresql",
+  "dialect": "sqlite",
   "entries": [
     {
       "idx": 0,
-      "version": "7",
-      "when": 1780062068030,
-      "tag": "0000_greedy_wallflower",
+      "version": "6",
+      "when": 1782388466038,
+      "tag": "0000_cuddly_starjammers",
       "breakpoints": true
     }
   ]

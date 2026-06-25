@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
 
 ENV BUN_INSTALL="/root/.bun"
 ENV PATH="$BUN_INSTALL/bin:$PATH"
-RUN curl -fsSL https://bun.sh/install | bash
+RUN curl -fsSL https://bun.sh/install | bash -s -- bun-v1.3.11
 
 WORKDIR /app
 
@@ -17,6 +17,10 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
 COPY . .
+
+# Persistent data directory for the SQLite database
+RUN mkdir -p /app/data
+VOLUME /app/data
 
 EXPOSE 3000
 

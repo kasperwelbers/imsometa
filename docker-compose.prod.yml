@@ -1,0 +1,21 @@
+## NAS / production deployment — runs the pre-built image from Docker Hub.
+## Copy this file to your NAS and run:
+##
+##   IMAGE=your-dockerhub-username/imsometa:latest docker compose -f docker-compose.prod.yml up -d
+
+services:
+  app:
+    # Replace with your Docker Hub username, e.g. johndoe/imsometa:latest
+    image: ${IMAGE:-your-dockerhub-username/imsometa:latest}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - app_data:/app/data
+    environment:
+      NODE_ENV: production
+      PROXY_DATACENTER: ${PROXY_DATACENTER:-}
+      PROXY_RESIDENTIAL: ${PROXY_RESIDENTIAL:-}
+
+volumes:
+  app_data:

@@ -1,30 +1,14 @@
 ## This is for DEV. It runs the Dockerfile with hot reloading
+## After changing dependencies (package.json / bun.lock) run:
+##   docker compose down -v && docker compose up --build
 
 services:
-  postgres:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: imsometa
-      POSTGRES_USER: imsometa
-      POSTGRES_PASSWORD: imsometa
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U imsometa"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   app:
     build: .
-    depends_on:
-      postgres:
-        condition: service_healthy
-
     volumes:
       - .:/app
       - /app/node_modules
+      - app_data:/app/data
 
     # ENABLE HOT RELOADING
     command: bun --hot src/index.ts
@@ -34,7 +18,8 @@ services:
 
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgres://imsometa:imsometa@postgres:5432/imsometa
+      - PROXY_DATACENTER
+      - PROXY_RESIDENTIAL
 
 volumes:
-  postgres_data:
+  app_data:

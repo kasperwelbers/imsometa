@@ -1,25 +1,25 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
-import postgres from "postgres";
+import { Database } from "bun:sqlite";
+import { drizzle } from "drizzle-orm/bun-sqlite";
+import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { eq } from "drizzle-orm";
+import { mkdirSync } from "fs";
 import * as schema from "./schema.ts";
 import { batchItems } from "./schema.ts";
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ??
-  "postgres://imsometa:imsometa@localhost:5432/imsometa";
+const DB_PATH = process.env.DATABASE_PATH ?? "./data/imsometa.db";
 
-const client = postgres(DATABASE_URL, {
-  max: 10,
-  idle_timeout: 20,
-  connect_timeout: 30,
-});
+// Ensure the data directory exists before opening the file
+mkdirSync(DB_PATH.substring(0, DB_PATH.lastIndexOf("/")), { recursive: true });
 
-export const db = drizzle(client, { schema });
+const sqlite = new Database(DB_PATH);
+sqlite.run("PRAGMA journal_mode = WAL");
+sqlite.run("PRAGMA foreign_keys = ON");
+
+export const db = drizzle(sqlite, { schema });
 
 export async function initDb(): Promise<void> {
   // Apply any pending migrations (creates tables on first run)
-  await migrate(db, { migrationsFolder: "./drizzle" });
+  migrate(db, { migrationsFolder: "./drizzle" });
 
   // Reset items stuck in 'processing' state from a previous crash
   await db
